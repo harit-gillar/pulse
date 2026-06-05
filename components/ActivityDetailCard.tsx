@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Sparkline } from "@/components/Sparkline";
+import { activityEmoji } from "@/lib/activityVisuals";
 import type { ActivitySession, HeartRateZones, Intensity } from "@/lib/types";
 
 const ACTIVITY_META: Record<string, { label: string; emoji: string }> = {
@@ -55,6 +56,7 @@ interface Props {
 export function ActivityDetailCard({ session, delay = 0 }: Props) {
   const meta = ACTIVITY_META[session.type] ?? { label: session.type, emoji: "•" };
   const title = session.label ?? meta.label;
+  const emoji = activityEmoji(title);
   const intensityColor = session.intensity ? INTENSITY_COLOR[session.intensity] : "var(--muted)";
   const strainPct = Math.min(100, (session.strain / 21) * 100);
 
@@ -69,7 +71,7 @@ export function ActivityDetailCard({ session, delay = 0 }: Props) {
       <div className="flex items-start justify-between gap-4 pb-4 border-b border-separator/60">
         <div className="flex items-start gap-3.5 min-w-0">
           <div className="w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center text-2xl flex-shrink-0">
-            {meta.emoji}
+            {emoji}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">

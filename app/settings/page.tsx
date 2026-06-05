@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettings } from "@/lib/useSettings";
 import { useTheme } from "@/lib/useTheme";
 import { Calendar } from "@/components/Calendar";
-import { todayISO } from "@/lib/dates";
+import { todayISO, addDaysISO } from "@/lib/dates";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -25,6 +25,50 @@ export default function SettingsPage() {
   const [earliest, setEarliest] = useState("2024-01-01");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const today = todayISO();
+
+  // Deep history sync (chunked, with progress).
+  const [deep, setDeep] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [deepPct, setDeepPct] = useState(0);
+  const [deepMsg, setDeepMsg] = useState("");
+  const cancelRef = useRef(false);
+
+  async function syncFullHistory() {
+    setDeep("running");
+    setDeepPct(0);
+    setDeepMsg("Starting…");
+    cancelRef.current = false;
+    const MAX_WINDOWS = 16; // ~4 years cap
+    const WINDOW = 90;
+    let to = today;
+    let totalSaved = 0;
+    let oldest = today;
+    let emptyStreak = 0;
+    try {
+      for (let w = 0; w < MAX_WINDOWS; w++) {
+        if (cancelRef.current) break;
+        const windowStart = addDaysISO(to, -WINDOW);
+        setDeepMsg(`Syncing ${fmtShort(windowStart)} → ${fmtShort(to)}…`);
+        const res = await fetch(`/api/backfill?to=${to}&days=${WINDOW}`, { method: "POST" });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "sync failed");
+        const json = await res.json();
+        const saved = json.saved ?? 0;
+        totalSaved += saved;
+        if (json.from) oldest = json.from;
+        setDeepPct(Math.min(96, (w + 1) * (96 / MAX_WINDOWS)));
+        setDeepMsg(`${totalSaved} days synced · back to ${fmtShort(oldest)}`);
+        if (saved === 0) { emptyStreak++; if (emptyStreak >= 2) break; } else emptyStreak = 0;
+        to = windowStart;
+      }
+      setDeepPct(100);
+      setDeep("done");
+      setDeepMsg(totalSaved > 0 ? `Done — ${totalSaved} days synced, back to ${fmtShort(oldest)}.` : "No more history found.");
+      const fresh = await fetch("/api/snapshots").then((r) => r.json()).catch(() => null);
+      if (fresh?.dates?.length) setEarliest(fresh.dates[0]);
+    } catch (e) {
+      setDeep("error");
+      setDeepMsg(e instanceof Error ? e.message : "Sync failed.");
+    }
+  }
 
   useEffect(() => {
     if (!supabase) return;
@@ -159,6 +203,28 @@ export default function SettingsPage() {
             )}
           </AnimatePresence>
         </div>
+
+        <Row label="Sync full history" sub="Pull all your past data from Google Health (chunked)">
+          <button
+            onClick={syncFullHistory}
+            disabled={!supabase || deep === "running"}
+            className="px-3 py-1.5 rounded-full text-xs font-medium border border-separator text-foreground hover:bg-surface disabled:opacity-40 transition"
+          >
+            {deep === "running" ? "Syncing…" : "Sync full history"}
+          </button>
+        </Row>
+        {deep !== "idle" && (
+          <div className="px-5 pb-4 -mt-1">
+            <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-accent"
+                animate={{ width: `${deepPct}%` }}
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              />
+            </div>
+            <div className={`text-xs mt-2 ${deep === "error" ? "text-red" : "text-muted"}`}>{deepMsg}</div>
+          </div>
+        )}
       </Section>
 
       {/* ACCOUNT */}
@@ -168,7 +234,13 @@ export default function SettingsPage() {
             {email ?? (supabase ? "Not signed in" : "Demo (Supabase not configured)")}
           </span>
         </Row>
-        <Row label="Re-sync history" sub="Re-pull the last 30 days from Google Health">
+        <Row label="Sync status">
+          <span className="inline-flex items-center gap-2 text-sm text-muted">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
+            {email ? "Connected to Google Health" : "—"}
+          </span>
+        </Row>
+        <Row label="Re-sync recent" sub="Re-pull the last 30 days from Google Health">
           <button
             onClick={reSync}
             disabled={!supabase || resync === "running"}
@@ -178,7 +250,9 @@ export default function SettingsPage() {
           </button>
         </Row>
         {resyncMsg && (
-          <div className={`text-xs mt-1 ${resync === "error" ? "text-red" : "text-accent"}`}>{resyncMsg}</div>
+          <div className="px-5 pb-2 -mt-1">
+            <div className={`text-xs ${resync === "error" ? "text-red" : "text-accent"}`}>{resyncMsg}</div>
+          </div>
         )}
         {email && (
           <Row label="Sign out">

@@ -51,13 +51,6 @@ export default function DashboardPage() {
     };
   }, [supabase]);
 
-  async function signOut() {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    setD(mockDashboard);
-    setSource("mock");
-  }
-
   return (
     <DashboardView
       data={d}
@@ -65,19 +58,9 @@ export default function DashboardPage() {
         source === "live" ? <DateNav date={today} earliest={earliest} latest={today} availableDates={allDates} /> : undefined
       }
       headerRight={
-        <div className="flex items-center gap-4 text-xs text-muted">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
-            {source === "live" ? `Synced ${d.lastSync}` : "Demo data"}
-          </div>
-          {source === "live" && supabase && (
-            <button
-              onClick={signOut}
-              className="px-3 py-1 rounded-full border border-separator hover:text-foreground hover:bg-surface transition"
-            >
-              Sign out
-            </button>
-          )}
+        <div className="flex items-center gap-2 text-xs text-muted">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
+          {source === "live" ? `Synced ${d.lastSync}` : "Demo data"}
         </div>
       }
       footer={

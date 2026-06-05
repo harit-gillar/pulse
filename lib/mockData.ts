@@ -6,6 +6,7 @@ import type {
   DashboardData,
   PersonalRecords,
 } from "./types";
+import { activityEmoji } from "./activityVisuals";
 
 const wiggle = (base: number, amp: number, n: number, seed = 1) =>
   Array.from({ length: n }, (_, i) =>
@@ -283,7 +284,7 @@ export function aggregateActivities(sessions: ActivitySession[]): ActivityAggreg
     out.push({
       type,
       label: name,
-      emoji: ACTIVITY_META[type].emoji,
+      emoji: activityEmoji(name),
       count: total,
       longestSessionMin: Math.max(...list.map((s) => s.durationMin)),
       avgDurationMin: Math.round(sum((s) => s.durationMin) / total),

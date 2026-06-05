@@ -60,7 +60,7 @@ export function ActivitiesPanel({ aggregates }: Props) {
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                    className="overflow-hidden bg-black/30"
+                    className="overflow-hidden bg-surface-2/60"
                   >
                     <div className="px-5 pt-4 pb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <Stat label="Longest Session" value={a.longestSessionMin} unit="min" />

@@ -10,7 +10,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const days = Math.min(90, Math.max(1, Number(new URL(request.url).searchParams.get("days")) || 30));
+  const params = new URL(request.url).searchParams;
+  const days = Math.min(90, Math.max(1, Number(params.get("days")) || 30));
+
+  // `to` = exclusive end of the window (default today). Lets the client walk
+  // backwards in 90-day chunks for a deep history sync.
+  const toParam = params.get("to");
+  const end = toParam && /^\d{4}-\d{2}-\d{2}$/.test(toParam)
+    ? new Date(toParam + "T00:00:00")
+    : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+  const start = new Date(end); start.setDate(start.getDate() - days);
 
   const supabase = await getSupabaseServer();
   if (!supabase) return NextResponse.json({ error: "supabase not configured" }, { status: 501 });
@@ -23,15 +32,17 @@ export async function POST(request: Request) {
   const token = (await getAccessToken(session.user.id)) ?? (session as { provider_token?: string }).provider_token;
   if (!token) return NextResponse.json({ error: "no access token — re-auth" }, { status: 401 });
 
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
   let history: Awaited<ReturnType<typeof fetchHistory>>;
   try {
-    history = await fetchHistory(token, days);
+    history = await fetchHistory(token, start, end);
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "backfill failed" }, { status: 502 });
   }
 
   if (history.length === 0) {
-    return NextResponse.json({ saved: 0, note: "no historical data returned" });
+    return NextResponse.json({ saved: 0, window: { from: fmt(start), to: fmt(end) }, note: "no data in window" });
   }
 
   const rows = history.map((h) => ({
@@ -44,5 +55,10 @@ export async function POST(request: Request) {
   const { error } = await supabase.from("daily_snapshots").upsert(rows);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ saved: rows.length, from: history[0].date, to: history[history.length - 1].date });
+  return NextResponse.json({
+    saved: rows.length,
+    from: history[0].date,
+    to: history[history.length - 1].date,
+    window: { from: fmt(start), to: fmt(end) },
+  });
 }

@@ -437,31 +437,32 @@ function dailyDateKey(p: RawDataPoint): string {
  */
 export async function fetchHistory(
   token: string,
-  days: number,
+  startDate: Date,
+  endDate: Date,
 ): Promise<{ date: string; data: DashboardData }[]> {
   const pad = (n: number) => String(n).padStart(2, "0");
   const localKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const tomorrow = addDays(today, 1);
-  const start = addDays(today, -days);
-  const tsStart = isoNoMs(start), tsEnd = isoNoMs(tomorrow);
-  const dStart = localKey(start), dEnd = localKey(tomorrow);
+  const start = new Date(startDate); start.setHours(0, 0, 0, 0);
+  const end = new Date(endDate); end.setHours(0, 0, 0, 0); // exclusive
+  const numDays = Math.max(0, Math.round((end.getTime() - start.getTime()) / 86_400_000));
+  const tsStart = isoNoMs(start), tsEnd = isoNoMs(end);
+  const dStart = localKey(start), dEnd = localKey(end);
   const civilTs = (d: Date) => `${localKey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
   const profile = (await fetch(`${BASE}/users/me/profile`, { headers: HEADERS(token), cache: "no-store" })
     .then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { age?: number } | null;
 
   const [sleepPts, rhrPts, hrvPts, weightPts, spo2Pts, stepsRollup, azmRollup, exercisePts] = await Promise.all([
-    listDataPoints(token, "sleep", `sleep.interval.end_time >= "${tsStart}" AND sleep.interval.end_time < "${tsEnd}"`, 30),
+    listDataPoints(token, "sleep", `sleep.interval.end_time >= "${tsStart}" AND sleep.interval.end_time < "${tsEnd}"`, 40),
     listDataPoints(token, "daily-resting-heart-rate", `daily_resting_heart_rate.date >= "${dStart}" AND daily_resting_heart_rate.date < "${dEnd}"`),
     listDataPoints(token, "daily-heart-rate-variability", `daily_heart_rate_variability.date >= "${dStart}" AND daily_heart_rate_variability.date < "${dEnd}"`),
     listDataPoints(token, "weight", `weight.sample_time.physical_time >= "${tsStart}" AND weight.sample_time.physical_time < "${tsEnd}"`),
-    listDataPoints(token, "oxygen-saturation", `oxygen_saturation.sample_time.physical_time >= "${tsStart}" AND oxygen_saturation.sample_time.physical_time < "${tsEnd}"`, 30),
-    dailyRollUp(token, "steps", start, tomorrow),
-    dailyRollUp(token, "active-zone-minutes", start, tomorrow),
-    listDataPoints(token, "exercise", `exercise.interval.civil_start_time >= "${civilTs(start)}" AND exercise.interval.civil_start_time < "${civilTs(tomorrow)}"`, 10),
+    listDataPoints(token, "oxygen-saturation", `oxygen_saturation.sample_time.physical_time >= "${tsStart}" AND oxygen_saturation.sample_time.physical_time < "${tsEnd}"`, 40),
+    dailyRollUp(token, "steps", start, end),
+    dailyRollUp(token, "active-zone-minutes", start, end),
+    listDataPoints(token, "exercise", `exercise.interval.civil_start_time >= "${civilTs(start)}" AND exercise.interval.civil_start_time < "${civilTs(end)}"`, 20),
   ]);
 
   // Workouts, bucketed by their own start date.
@@ -509,8 +510,8 @@ export async function fetchHistory(
   let lastWeightG: number | null = null;
   let prevStrain = 0;
 
-  for (let i = days; i >= 1; i--) {
-    const day = addDays(today, -i);
+  for (let i = 0; i < numDays; i++) {
+    const day = addDays(start, i);
     const key = localKey(day);
 
     const sleepP = sleepByDate.get(key) as
@@ -663,7 +664,11 @@ function parseExerciseSessions(pts: RawDataPoint[], fallbackDate: string): Activ
 
     const ms = ex.metricsSummary ?? {};
     const displayName = ex.displayName;
-    const type = mapExerciseType(ex.exerciseType ?? displayName ?? "activity");
+    let type = mapExerciseType(ex.exerciseType ?? displayName ?? "activity");
+    if (type === "activity" && displayName) {
+      const fromName = mapExerciseType(displayName);
+      if (fromName !== "activity") type = fromName;
+    }
 
     const calories = Math.round(num(ms.caloriesKcal));
     const avgHr = Math.round(num(ms.averageHeartRateBeatsPerMinute));
