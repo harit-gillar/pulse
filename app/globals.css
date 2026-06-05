@@ -1,26 +1,135 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root,
+[data-theme="dark"] {
+  --background: #000000;
+  --surface: #0f0f10;
+  --surface-2: #1a1a1c;
+  --foreground: #f5f5f7;
+  --muted: #8a8a90;
+  --separator: #2a2a2d;
+  --tile-border: rgba(255, 255, 255, 0.04);
+  --tile-border-hover: rgba(255, 255, 255, 0.07);
+  --tile-light: rgba(255, 255, 255, 0.025);
+  --tile-shadow: 0 6px 20px -10px rgba(0, 0, 0, 0.5);
+  --ring-track: rgba(255, 255, 255, 0.06);
+
+  --accent: #34d399;
+  --accent-dim: #10b981;
+  --blue: #60a5fa;
+  --purple: #c084fc;
+  --orange: #fb923c;
+  --pink: #f472b6;
+  --red: #f87171;
+
+  --radius-tile: 22px;
+}
+
+[data-theme="light"] {
+  --background: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #fafafa;
+  --foreground: #1d1d1f;
+  --muted: #6e6e73;
+  --separator: #d2d2d7;
+  --tile-border: rgba(0, 0, 0, 0.06);
+  --tile-border-hover: rgba(0, 0, 0, 0.12);
+  --tile-light: rgba(0, 0, 0, 0.025);
+  --tile-shadow: 0 6px 22px -10px rgba(0, 0, 0, 0.18);
+  --ring-track: rgba(0, 0, 0, 0.06);
+
+  --accent: #10b981;
+  --accent-dim: #059669;
+  --blue: #2563eb;
+  --purple: #9333ea;
+  --orange: #ea580c;
+  --pink: #db2777;
+  --red: #dc2626;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-separator: var(--separator);
+  --color-accent: var(--accent);
+  --color-blue: var(--blue);
+  --color-purple: var(--purple);
+  --color-orange: var(--orange);
+  --color-pink: var(--pink);
+  --color-red: var(--red);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Hide Next.js dev tools indicator (the floating "N" badge). */
+nextjs-portal {
+  display: none !important;
 }
 
-body {
+html, body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+
+::selection {
+  background: rgba(52, 211, 153, 0.3);
+}
+
+.tile {
+  background: var(--surface);
+  border-radius: var(--radius-tile);
+  border: 1px solid var(--tile-border);
+  transition:
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.3s ease,
+    box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.3s ease;
+  will-change: transform;
+  position: relative;
+  overflow: hidden;
+}
+
+.tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(280px circle at var(--mx, 50%) var(--my, 50%), var(--tile-light), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tile > * {
+  position: relative;
+  z-index: 1;
+}
+
+.tile:hover {
+  border-color: var(--tile-border-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--tile-shadow);
+}
+
+.tile:hover::before {
+  opacity: 1;
+}
+
+.tile-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.section-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
 }
