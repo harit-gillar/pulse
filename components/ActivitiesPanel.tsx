@@ -67,10 +67,8 @@ export function ActivitiesPanel({ aggregates }: Props) {
                       <Stat label="Avg Duration" value={a.avgDurationMin} unit="min" />
                       <Stat label="Most Calories" value={a.mostCaloriesSingleSession.toLocaleString()} unit="kcal" />
                       <Stat label="Total Calories" value={a.totalCalories.toLocaleString()} unit="kcal" />
-                      <Stat label="Peak Strain" value={a.peakStrain.toFixed(1)} color="var(--orange)" />
-                      <Stat label="Avg Strain" value={a.avgStrain.toFixed(1)} color="var(--blue)" />
                       <Stat label="Avg Heart Rate" value={a.avgHr} unit="bpm" />
-                      <Stat label="Max Heart Rate" value={a.maxHr} unit="bpm" />
+                      {a.maxHr > 0 && <Stat label="Max Heart Rate" value={a.maxHr} unit="bpm" />}
                     </div>
                   </motion.div>
                 )}

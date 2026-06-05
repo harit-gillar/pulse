@@ -18,7 +18,7 @@ export function TopNav() {
   return (
     <div className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-separator/60">
       <div className="mx-auto max-w-[1200px] px-6 py-3 flex items-center justify-between gap-3">
-        <Link href="/" className="text-sm font-semibold tracking-tight flex items-center gap-2">
+        <Link href="/dashboard" className="text-sm font-semibold tracking-tight flex items-center gap-2">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
           Pulse
         </Link>

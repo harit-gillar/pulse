@@ -9,7 +9,7 @@ import { mockAllTimeStats, mockPersonalRecords, mockActivityAggregates } from "@
 import { ActivitiesPanel } from "@/components/ActivitiesPanel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { todayISO, addDaysISO } from "@/lib/dates";
-import { loadSettings } from "@/lib/useSettings";
+import { loadSettings, useSettings } from "@/lib/useSettings";
 import type { AllTimeStats, PersonalRecords, ActivityAggregate } from "@/lib/types";
 
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -34,6 +34,7 @@ const PRESETS: { label: string; days: number | null }[] = [
 
 export default function StatsPage() {
   const supabase = getSupabaseBrowser();
+  const { update } = useSettings();
   const [s, setS] = useState<AllTimeStats>(mockAllTimeStats);
   const [p, setP] = useState<PersonalRecords>(mockPersonalRecords);
   const [activities, setActivities] = useState<ActivityAggregate[]>(mockActivityAggregates);
@@ -43,6 +44,9 @@ export default function StatsPage() {
   const [from, setFrom] = useState<string>(""); // "" = all time
   const [earliest, setEarliest] = useState<string>("2024-01-01");
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Persist a custom start date so it sticks across visits.
+  const setAndSaveFrom = (d: string) => { setFrom(d); update({ statsFrom: d }); };
 
   // Apply the saved default stats window + fetch the available range for the picker.
   useEffect(() => {
@@ -102,7 +106,11 @@ export default function StatsPage() {
               return (
                 <button
                   key={preset.label}
-                  onClick={() => { setPickerOpen(false); setFrom(preset.days === null ? "" : addDaysISO(today, -preset.days)); }}
+                  onClick={() => {
+                    setPickerOpen(false);
+                    if (preset.days === null) setAndSaveFrom("");      // All time persists
+                    else setFrom(addDaysISO(today, -preset.days));     // relative presets are session-only
+                  }}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition
                     ${isActive ? "bg-foreground text-background border-foreground" : "border-separator text-muted hover:text-foreground hover:bg-surface"}`}
                 >
@@ -125,7 +133,7 @@ export default function StatsPage() {
                     selected={from || earliest}
                     earliest={earliest}
                     latest={today}
-                    onPick={(d) => { setFrom(d); setPickerOpen(false); }}
+                    onPick={(d) => { setAndSaveFrom(d); setPickerOpen(false); }}
                     className="absolute top-full left-0 mt-2"
                   />
                 </>

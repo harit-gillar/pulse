@@ -64,7 +64,7 @@ export default function Home() {
             </button>
           )}
           <Link
-            href="/dashboard"
+            href="/demo"
             className="inline-flex items-center justify-center px-5 py-3 rounded-full border border-separator text-foreground font-medium text-sm hover:bg-surface transition"
           >
             View demo dashboard

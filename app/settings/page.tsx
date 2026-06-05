@@ -124,7 +124,7 @@ export default function SettingsPage() {
       </Section>
 
       {/* DATA */}
-      <Section title="Data">
+      <Section title="Data" className={datePickerOpen ? "z-50" : ""}>
         <div className="relative">
           <Row label="Stats start date" sub="Default window for the Stats page">
             <div className="flex items-center gap-2">
@@ -199,9 +199,9 @@ export default function SettingsPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className="mb-8">
+    <section className={`mb-8 relative ${className ?? ""}`}>
       <div className="section-label mb-3">{title}</div>
       <div className="tile divide-y divide-separator/40">{children}</div>
     </section>
