@@ -74,12 +74,6 @@ export default function HistoricalDashboardPage() {
     <DashboardView
       data={data}
       headerLeftExtra={<DateNav date={date} earliest={earliest} latest={today} availableDates={dates} />}
-      headerRight={
-        <div className="flex items-center gap-2 text-xs text-muted">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted" />
-          From your history
-        </div>
-      }
       footer={
         <footer className="text-xs text-muted text-center pt-4 pb-2">
           Saved snapshot from {fmtLongDate(date)}.
