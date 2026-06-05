@@ -62,8 +62,8 @@ export const METRIC_INFO: Record<string, MetricInfo> = {
     formula: "Z2_min + 2·(Z3_min + Z4_min + Z5_min)",
     source: "Google",
   },
-  Calories: {
-    desc: "Total energy burned — basal metabolism plus all activity.",
+  "Total Calories Burned": {
+    desc: "Total energy burned today — basal metabolism plus all activity.",
     formula: "active-energy-burned + BMR (Mifflin-St Jeor)",
     source: "Google",
   },

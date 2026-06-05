@@ -194,7 +194,7 @@ export function DashboardView({ data, greeting, headerRight, headerLeftExtra, fo
         <div className="section-label mb-3">Activity</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <MetricTile label="Active Zone Min" value={activity.activeZoneMinutes} unit="min" sub="Today" delay={0.04} />
-          <MetricTile label="Calories" value={activity.calories.toLocaleString()} sub={`Goal ${caloriesGoal.toLocaleString()}`} delay={0.1}>
+          <MetricTile label="Total Calories Burned" value={activity.calories.toLocaleString()} sub={`Goal ${caloriesGoal.toLocaleString()}`} delay={0.1}>
             <div className="mt-3"><ProgressBar value={activity.calories} max={caloriesGoal} color="var(--orange)" delay={0.3} /></div>
           </MetricTile>
           <MetricTile label="Distance" value={toDistance(activity.distanceKm, settings.distanceUnit).toFixed(1)} unit={settings.distanceUnit} sub="Today" delay={0.16} />
