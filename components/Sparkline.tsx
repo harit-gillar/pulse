@@ -40,15 +40,17 @@ function CustomTooltip({ active, payload, unit }: TooltipProps) {
 
 export function Sparkline({ data, color, height = 56, labels, unit }: Props) {
   const chartData = data.map((v, i) => ({ i, v, label: labels?.[i] }));
-  const id = `spark-${color.replace("#", "")}`;
+  // Sanitize the gradient id — colors like "var(--blue)" contain characters
+  // that break the SVG url(#…) reference (and caused the dark fallback fill).
+  const id = `spark-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer>
         <AreaChart data={chartData} margin={{ top: 6, right: 0, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={color} stopOpacity={0} />
+              <stop offset="0%" stopColor={color} stopOpacity={0.18} />
+              <stop offset="100%" stopColor={color} stopOpacity={0.01} />
             </linearGradient>
           </defs>
           <Tooltip

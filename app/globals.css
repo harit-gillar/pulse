@@ -92,7 +92,9 @@ html, body {
     background 0.3s ease;
   will-change: transform;
   position: relative;
-  overflow: hidden;
+  /* No overflow:hidden here — it clipped sparkline tooltips. The cursor-glow
+     ::before is self-clipped by its own border-radius. Tiles that need clipping
+     (e.g. the activities list) opt in with `overflow-hidden`. */
 }
 
 .tile::before {

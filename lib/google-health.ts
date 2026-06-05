@@ -630,60 +630,83 @@ function mapExerciseType(raw: string): ActivityType {
   return EXERCISE_TYPE_MAP[k] ?? "activity";
 }
 
-function findStringByKeyHint(obj: unknown, hints: string[]): string | null {
-  if (obj == null || typeof obj !== "object") return null;
-  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-    if (hints.some((h) => k.toLowerCase().includes(h)) && typeof v === "string" && v.length) return v;
-  }
-  for (const v of Object.values(obj as Record<string, unknown>)) {
-    if (v && typeof v === "object") { const f = findStringByKeyHint(v, hints); if (f) return f; }
-  }
-  return null;
+interface ExerciseMetricsSummary {
+  caloriesKcal?: number;
+  averageHeartRateBeatsPerMinute?: string;
+  distanceMillimeters?: number;
+  averagePaceSecondsPerMeter?: number;
+  elevationGainMillimeters?: number;
+  heartRateZoneDurations?: { lightTime?: string; moderateTime?: string; vigorousTime?: string; peakTime?: string };
+}
+interface ExerciseBody {
+  interval?: { startTime?: string; endTime?: string };
+  exerciseType?: string;
+  displayName?: string;
+  metricsSummary?: ExerciseMetricsSummary;
 }
 
-/** Parse Google Health `exercise` session dataPoints into ActivitySession[]. Best-effort.
- *  Each session's date is derived from its own start time (so it works for multi-day backfill). */
+// "1920s" → 1920 (seconds). parseFloat ignores the trailing unit.
+const secs = (v: unknown) => (v == null ? 0 : parseFloat(String(v)) || 0);
+
+/** Parse Google Health `exercise` session dataPoints into ActivitySession[].
+ *  Calibrated against the real metricsSummary shape. Each session is dated by
+ *  its own start time, so this works for both today and multi-day backfill. */
 function parseExerciseSessions(pts: RawDataPoint[], fallbackDate: string): ActivitySession[] {
   const pad = (n: number) => String(n).padStart(2, "0");
   const out: ActivitySession[] = [];
   pts.forEach((p, i) => {
-    const ex = (p as { exercise?: Record<string, unknown> }).exercise ?? p;
-    const interval = (ex as { interval?: { startTime?: string; endTime?: string } }).interval;
-    const start = interval?.startTime ? new Date(interval.startTime) : null;
-    const end = interval?.endTime ? new Date(interval.endTime) : null;
+    const ex = ((p as { exercise?: ExerciseBody }).exercise ?? p) as ExerciseBody;
+    const start = ex.interval?.startTime ? new Date(ex.interval.startTime) : null;
+    const end = ex.interval?.endTime ? new Date(ex.interval.endTime) : null;
     const durationMin = start && end ? Math.round((end.getTime() - start.getTime()) / 60000) : 0;
     const date = start ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}` : fallbackDate;
 
-    const displayName = findStringByKeyHint(ex, ["displayname", "title"]) ?? undefined;
-    const rawType = findStringByKeyHint(ex, ["exercisetype", "activitytype", "category"]) ?? displayName ?? "activity";
-    const calories = Math.round(num(findNumberByKeyHint(ex, ["calorie", "energy", "kcal"]) ?? 0));
-    const avgHr = Math.round(num(findNumberByKeyHint(ex, ["averageheartrate", "avgheartrate", "meanheartrate", "averagebpm", "avgbpm"]) ?? 0));
-    const maxHr = Math.round(
-      num(findNumberByKeyHint(ex, ["maxheartrate", "maximumheartrate", "maxbpm", "peakheartrate", "maximum", "peak", "highest"]) ?? 0),
-    );
-    // Distance comes back in millimetres (consistent with the daily distance rollup).
-    const distMm = num(findNumberByKeyHint(ex, ["distancemeters", "meters", "distance"]) ?? 0);
-    const distanceKm = distMm ? +(distMm / 1_000_000).toFixed(2) : undefined;
+    const ms = ex.metricsSummary ?? {};
+    const displayName = ex.displayName;
+    const type = mapExerciseType(ex.exerciseType ?? displayName ?? "activity");
+
+    const calories = Math.round(num(ms.caloriesKcal));
+    const avgHr = Math.round(num(ms.averageHeartRateBeatsPerMinute));
+    const distanceKm = ms.distanceMillimeters ? +(num(ms.distanceMillimeters) / 1_000_000).toFixed(2) : undefined;
+    const paceMinPerKm = ms.averagePaceSecondsPerMeter ? +((num(ms.averagePaceSecondsPerMeter) * 1000) / 60).toFixed(2) : undefined;
+    const elevationM = ms.elevationGainMillimeters ? Math.round(num(ms.elevationGainMillimeters) / 1000) : undefined;
     const startTime = start ? `${pad(start.getHours())}:${pad(start.getMinutes())}` : undefined;
-    let mappedType = mapExerciseType(rawType);
-    if (mappedType === "activity" && displayName) {
-      const fromName = mapExerciseType(displayName);
-      if (fromName !== "activity") mappedType = fromName;
+
+    // Heart-rate zones from the Fitbit zone durations (seconds → minutes).
+    const z = ms.heartRateZoneDurations;
+    let zones: ActivitySession["zones"];
+    if (z) {
+      const light = secs(z.lightTime) / 60;
+      const mod = secs(z.moderateTime) / 60;
+      const vig = secs(z.vigorousTime) / 60;
+      const peak = secs(z.peakTime) / 60;
+      const inZone = light + mod + vig + peak;
+      if (inZone > 0) {
+        zones = {
+          zone0Min: Math.max(0, Math.round(durationMin - inZone)),
+          zone1Min: Math.round(light),
+          zone2Min: Math.round(mod),
+          zone3Min: Math.round(vig),
+          zone4Min: Math.round(peak),
+        };
+      }
     }
 
     out.push({
       id: `ex-${date}-${i}`,
-      type: mappedType,
-      // Prefer the source's own name; only fall back to our enum label when it adds nothing.
-      label: displayName && displayName.toLowerCase() !== mappedType ? displayName : undefined,
+      type,
+      label: displayName || undefined,
       date,
       startTime,
       durationMin,
       calories,
       strain: 0,
       avgHr,
-      maxHr,
+      maxHr: 0, // not in the summary — derived from HR samples for today's sessions
       distanceKm: distanceKm && distanceKm > 0.05 ? distanceKm : undefined,
+      paceMinPerKm,
+      elevationM,
+      zones,
     });
   });
   return out.sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? ""));

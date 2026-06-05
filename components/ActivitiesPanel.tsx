@@ -18,7 +18,7 @@ export function ActivitiesPanel({ aggregates }: Props) {
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="tile p-0"
+      className="tile p-0 overflow-hidden"
     >
       <div className="flex items-center justify-between px-5 py-4 border-b border-separator/60">
         <span className="text-base font-semibold tracking-tight">Total Activities</span>
