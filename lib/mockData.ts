@@ -4,9 +4,14 @@ import type {
   ActivityType,
   AllTimeStats,
   DashboardData,
+  Insight,
   PersonalRecords,
+  Snap,
+  TrendPoint,
 } from "./types";
 import { activityEmoji } from "./activityVisuals";
+import { buildSeries } from "./trends";
+import { computeInsights } from "./insights";
 
 const wiggle = (base: number, amp: number, n: number, seed = 1) =>
   Array.from({ length: n }, (_, i) =>
@@ -303,3 +308,61 @@ export const mockActivityAggregates = aggregateActivities(mockSessions);
 
 // Demo dashboard shows the curated today sessions in its activities section.
 mockDashboard.sessions = getSessionsForDate(TODAY);
+
+// ---------- Trends + insights ----------
+//
+// Generate a deterministic stretch of recent history with *real* relationships
+// baked in (last night's sleep nudges next-day HRV/RHR, yesterday's strain
+// nudges recovery, weekends differ, HRV drifts up over time). We then run the
+// exact same buildSeries/computeInsights pipeline the live route uses, so the
+// demo exercises the real engine rather than hand-written copy.
+
+const MOCK_TREND_DAYS = 180;
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+function buildMockSnapshots(): Snap[] {
+  const snaps: Snap[] = [];
+  const start = addDays(TODAY, -(MOCK_TREND_DAYS - 1));
+  let prevSleep = 7.5;
+  let prevStrain = 8;
+  for (let i = 0; i < MOCK_TREND_DAYS; i++) {
+    const date = addDays(start, i);
+    const rand = mulberry32(Number(date.replace(/-/g, "")) + 7);
+    const dow = new Date(date + "T00:00:00").getDay();
+    const weekend = dow === 0 || dow === 6;
+
+    const sleep = +clamp(6.6 + (weekend ? 0.9 : 0) + (rand() - 0.5) * 2.2, 4, 10).toFixed(1);
+    const strain = +clamp(4 + rand() * 12, 0, 21).toFixed(1);
+
+    // Today's body reflects yesterday's behaviour, plus a gentle upward HRV drift.
+    const hrv = Math.round(clamp(54 + i * 0.09 + (prevSleep - 7.5) * 6 + (rand() - 0.5) * 9, 30, 110));
+    const rhr = Math.round(clamp(56 - (prevSleep - 7.5) * 3 + (rand() - 0.5) * 5, 42, 75));
+    const recovery = Math.round(clamp(72 - (prevStrain - 8) * 3.2 + (rand() - 0.5) * 14, 5, 99));
+    const performance = Math.round(clamp(sleep / 8 * 80 + (rand() - 0.5) * 14, 20, 100));
+    const steps = Math.round(clamp((weekend ? 12500 : 8200) + (rand() - 0.5) * 5000, 1500, 26000));
+
+    const base = mockDashboardForDate(date);
+    const d: DashboardData = {
+      ...base,
+      recovery: {
+        ...base.recovery,
+        score: recovery,
+        label: (recovery >= 67 ? "Optimal" : recovery >= 34 ? "Good" : "Low") as DashboardData["recovery"]["label"],
+        hrvMs: hrv,
+        restingHr: rhr,
+      },
+      strain: { ...base.strain, dayStrain: strain },
+      sleep: { ...base.sleep, durationHours: sleep, performanceScore: performance },
+      activity: { ...base.activity, steps },
+    };
+    snaps.push({ date, d });
+
+    prevSleep = sleep;
+    prevStrain = strain;
+  }
+  return snaps;
+}
+
+const mockSnapshots = buildMockSnapshots();
+export const mockTrendSeries: TrendPoint[] = buildSeries(mockSnapshots);
+export const mockInsights: Insight[] = computeInsights(mockSnapshots);

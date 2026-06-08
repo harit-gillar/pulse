@@ -95,6 +95,40 @@ export interface PersonalRecords {
   mostActiveDay: DatedNumber; // active zone minutes
 }
 
+// ---- Trends & insights ----
+
+// A single day's snapshot as loaded from daily_snapshots — the shared shape the
+// stats/trends routes and the insights engine all operate on.
+export interface Snap {
+  date: string; // ISO yyyy-mm-dd
+  d: DashboardData;
+}
+
+export type TrendMetricKey =
+  | "hrvMs"
+  | "restingHr"
+  | "recovery"
+  | "sleepHours"
+  | "sleepPerf"
+  | "steps"
+  | "calories"
+  | "activeZoneMin"
+  | "weightKg";
+
+// One charted day. Each metric is null when missing/unreliable so the line
+// breaks instead of dipping to zero (see lib/trends.ts).
+export type TrendPoint = { date: string } & Partial<Record<TrendMetricKey, number | null>>;
+
+export interface Insight {
+  id: string;
+  headline: string; // short claim, e.g. "Sleep lifts your next-day HRV"
+  detail: string; // plain-English sentence with the number; never says "causes"
+  metric: TrendMetricKey; // drives the accent color
+  sampleSize: number; // n — always shown
+  strength: "strong" | "moderate"; // from |r| or effect size
+  direction: "positive" | "negative" | "neutral";
+}
+
 // ---- Activities ----
 
 export type ActivityType =

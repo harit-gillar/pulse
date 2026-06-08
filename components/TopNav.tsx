@@ -7,6 +7,7 @@ import { useTheme } from "@/lib/useTheme";
 
 const TABS = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/trends", label: "Trends" },
   { href: "/stats", label: "Stats" },
 ];
 

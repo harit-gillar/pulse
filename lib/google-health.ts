@@ -454,13 +454,15 @@ export async function fetchHistory(
   const profile = (await fetch(`${BASE}/users/me/profile`, { headers: HEADERS(token), cache: "no-store" })
     .then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { age?: number } | null;
 
-  const [sleepPts, rhrPts, hrvPts, weightPts, spo2Pts, stepsRollup, azmRollup, exercisePts] = await Promise.all([
+  const [sleepPts, rhrPts, hrvPts, weightPts, spo2Pts, stepsRollup, caloriesRollup, distanceRollup, azmRollup, exercisePts] = await Promise.all([
     listDataPoints(token, "sleep", `sleep.interval.end_time >= "${tsStart}" AND sleep.interval.end_time < "${tsEnd}"`, 40),
     listDataPoints(token, "daily-resting-heart-rate", `daily_resting_heart_rate.date >= "${dStart}" AND daily_resting_heart_rate.date < "${dEnd}"`),
     listDataPoints(token, "daily-heart-rate-variability", `daily_heart_rate_variability.date >= "${dStart}" AND daily_heart_rate_variability.date < "${dEnd}"`),
     listDataPoints(token, "weight", `weight.sample_time.physical_time >= "${tsStart}" AND weight.sample_time.physical_time < "${tsEnd}"`),
     listDataPoints(token, "oxygen-saturation", `oxygen_saturation.sample_time.physical_time >= "${tsStart}" AND oxygen_saturation.sample_time.physical_time < "${tsEnd}"`, 40),
     dailyRollUp(token, "steps", start, end),
+    dailyRollUp(token, "total-calories", start, end),
+    dailyRollUp(token, "distance", start, end),
     dailyRollUp(token, "active-zone-minutes", start, end),
     listDataPoints(token, "exercise", `exercise.interval.civil_start_time >= "${civilTs(start)}" AND exercise.interval.civil_start_time < "${civilTs(end)}"`, 20),
   ]);
@@ -497,6 +499,9 @@ export async function fetchHistory(
   const rhrByDate = mapNum(rhrPts, ["bpm", "beats", "rate", "value"], 20, 200);
   const hrvByDate = mapNum(hrvPts, ["milli", "ms", "rmssd", "variability", "value"], 0, 400);
   const stepsByDate = mapNum(stepsRollup, ["count_sum", "count", "sum", "steps"], -1, 1e6);
+  const caloriesByDate = mapNum(caloriesRollup, ["calorie", "energy", "kcal", "sum", "value"], -1, 1e6);
+  // Distance arrives in millimeters (same as the live dashboard); /1e6 → km below.
+  const distanceMmByDate = mapNum(distanceRollup, ["meter", "distance", "sum", "value"], -1, 1e10);
   const azmByDate = mapNum(azmRollup, ["minutes", "azm", "sum", "value"], -1, 100000);
   const weightByDate = mapNum(weightPts, ["grams"], 1000, 500000);
   const spo2ByDate = new Map<string, number[]>();
@@ -522,12 +527,14 @@ export async function fetchHistory(
     const rhr = rhrByDate.get(key) ?? 0;
     const hrv = hrvByDate.get(key) ?? 0;
     const steps = stepsByDate.get(key) ?? 0;
+    const calories = caloriesByDate.has(key) ? Math.round(caloriesByDate.get(key)!) : 0;
+    const distanceKm = distanceMmByDate.has(key) ? +(distanceMmByDate.get(key)! / 1_000_000).toFixed(1) : 0;
     const azm = azmByDate.get(key) ?? 0;
     if (weightByDate.has(key)) lastWeightG = weightByDate.get(key)!;
     const spo2Arr = spo2ByDate.get(key);
     const daySessions = sessionsByDate.get(key) ?? [];
 
-    const hasData = !!summary || rhr > 0 || steps > 0 || daySessions.length > 0;
+    const hasData = !!summary || rhr > 0 || steps > 0 || calories > 0 || daySessions.length > 0;
     if (!hasData) continue;
 
     const stages = { deep: 0, rem: 0, light: 0, awake: 0 };
@@ -596,9 +603,9 @@ export async function fetchHistory(
           steps,
           stepsGoal: 10000,
           activeZoneMinutes: Math.round(azm),
-          calories: 0,
+          calories,
           caloriesGoal: 2800,
-          distanceKm: 0,
+          distanceKm,
         },
         body: {
           weightKg: lastWeightG ? +(lastWeightG / 1000).toFixed(1) : null,
