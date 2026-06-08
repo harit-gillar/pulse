@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { aggregateActivities } from "@/lib/mockData";
+import { aggregateActivities } from "@/lib/activities";
 import type { AllTimeStats, PersonalRecords, DashboardData, ActivitySession, DatedNumber } from "@/lib/types";
 
 // Aggregates the user's real daily_snapshots into all-time stats + personal records.

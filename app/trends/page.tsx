@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { Calendar } from "@/components/Calendar";
 import { TrendChart } from "@/components/TrendChart";
 import { InsightCard } from "@/components/InsightCard";
@@ -9,8 +10,9 @@ import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { todayISO, addDaysISO } from "@/lib/dates";
 import { loadSettings, useSettings } from "@/lib/useSettings";
 import { METRICS } from "@/lib/trends";
-import { mockTrendSeries, mockInsights } from "@/lib/mockData";
 import type { Insight, TrendMetricKey, TrendPoint } from "@/lib/types";
+
+type Status = "loading" | "live" | "empty" | "signin";
 
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -60,9 +62,9 @@ export default function TrendsPage() {
   const supabase = getSupabaseBrowser();
   const { update } = useSettings();
 
-  const [series, setSeries] = useState<TrendPoint[]>(mockTrendSeries);
-  const [insights, setInsights] = useState<Insight[]>(mockInsights);
-  const [source, setSource] = useState<"mock" | "live">("mock");
+  const [series, setSeries] = useState<TrendPoint[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [status, setStatus] = useState<Status>("loading");
 
   const today = todayISO();
   const [from, setFrom] = useState<string>(""); // "" = all time
@@ -83,16 +85,21 @@ export default function TrendsPage() {
 
   // Refetch whenever the window changes.
   useEffect(() => {
-    if (!supabase) return;
     let cancelled = false;
     (async () => {
+      if (!supabase) { setStatus("signin"); return; }
       const res = await fetch(`/api/trends${from ? `?from=${from}` : ""}`);
-      if (!res.ok || cancelled) return;
+      if (cancelled) return;
+      if (!res.ok) { setStatus(res.status === 401 ? "signin" : "empty"); return; }
       const json = await res.json();
       if (json.hasData) {
         setSeries(json.series ?? []);
         setInsights(json.insights ?? []);
-        setSource("live");
+        setStatus("live");
+      } else {
+        setSeries([]);
+        setInsights([]);
+        setStatus("empty");
       }
     })();
     return () => { cancelled = true; };
@@ -114,12 +121,10 @@ export default function TrendsPage() {
       >
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Your trends.</h1>
         <p className="text-sm text-muted mt-1">
-          {source === "live"
-            ? "How your metrics move over time, and what we noticed."
-            : "Demo data — sign in with Google to see your real trends."}
+          How your metrics move over time, and what we noticed.
         </p>
 
-        {source === "live" && (
+        {status === "live" && (
           <div className="relative mt-4 flex items-center gap-2 flex-wrap">
             {PRESETS.map((preset) => {
               const isActive = preset.days === null ? !from : activePresetDays === preset.days;
@@ -163,83 +168,129 @@ export default function TrendsPage() {
         )}
       </motion.header>
 
-      {/* WHAT WE NOTICED */}
-      <section className="mb-10">
-        <div className="section-label mb-3">What we noticed</div>
-        {insights.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {insights.map((ins, i) => (
-              <InsightCard key={ins.id} insight={ins} delay={0.02 * i} />
-            ))}
-          </div>
-        ) : (
-          <div className="tile p-8 text-center">
-            <p className="text-sm text-muted max-w-md mx-auto leading-relaxed">
-              Keep logging — insights appear once there&apos;s enough history to spot a reliable pattern (about two weeks).
-            </p>
-          </div>
-        )}
-      </section>
+      {status !== "live" ? (
+        <TrendsEmpty status={status} />
+      ) : (
+        <>
+          {/* WHAT WE NOTICED */}
+          <section className="mb-10">
+            <div className="section-label mb-3">What we noticed</div>
+            {insights.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {insights.map((ins, i) => (
+                  <InsightCard key={ins.id} insight={ins} delay={0.02 * i} />
+                ))}
+              </div>
+            ) : (
+              <div className="tile p-8 text-center">
+                <p className="text-sm text-muted max-w-md mx-auto leading-relaxed">
+                  Keep logging — insights appear once there&apos;s enough history to spot a reliable pattern (about two weeks).
+                </p>
+              </div>
+            )}
+          </section>
 
-      {/* CHARTS */}
-      <section className="mb-10">
-        <div className="section-label mb-3">Over time</div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {METRICS.map((m, i) => {
-            const decimals = m.decimals ?? 0;
-            const { avg, delta } = summarize(series, m.key);
-            const current = lastVal(series, m.key);
-            const hasAny = series.some((p) => p[m.key] != null);
-            return (
-              <motion.div
-                key={m.key}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.02 * i, ease: [0.22, 1, 0.36, 1] }}
-                className="tile p-5"
-              >
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <div className="section-label">{m.label}</div>
-                    <div className="mt-1.5 flex items-baseline gap-1.5">
-                      <span className="text-3xl font-semibold tracking-tight tile-tabular" style={{ color: m.color }}>
-                        {fmtVal(m.key, current, decimals)}
-                      </span>
-                      {m.unit && current != null && <span className="text-muted text-sm font-medium">{m.unit}</span>}
+          {/* CHARTS */}
+          <section className="mb-10">
+            <div className="section-label mb-3">Over time</div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {METRICS.map((m, i) => {
+                const decimals = m.decimals ?? 0;
+                const { avg, delta } = summarize(series, m.key);
+                const current = lastVal(series, m.key);
+                const hasAny = series.some((p) => p[m.key] != null);
+                return (
+                  <motion.div
+                    key={m.key}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.02 * i, ease: [0.22, 1, 0.36, 1] }}
+                    className="tile p-5"
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <div className="section-label">{m.label}</div>
+                        <div className="mt-1.5 flex items-baseline gap-1.5">
+                          <span className="text-3xl font-semibold tracking-tight tile-tabular" style={{ color: m.color }}>
+                            {fmtVal(m.key, current, decimals)}
+                          </span>
+                          {m.unit && current != null && <span className="text-muted text-sm font-medium">{m.unit}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right text-xs text-muted tile-tabular">
+                        {avg != null && <div>avg {fmtVal(m.key, avg, decimals)}{m.unit ? ` ${m.unit}` : ""}</div>}
+                        {delta != null && Math.abs(delta) >= 1 && (
+                          <div className="mt-0.5">
+                            {delta > 0 ? "▲" : "▼"} {Math.abs(Math.round(delta))}% vs earlier
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right text-xs text-muted tile-tabular">
-                    {avg != null && <div>avg {fmtVal(m.key, avg, decimals)}{m.unit ? ` ${m.unit}` : ""}</div>}
-                    {delta != null && Math.abs(delta) >= 1 && (
-                      <div className="mt-0.5">
-                        {delta > 0 ? "▲" : "▼"} {Math.abs(Math.round(delta))}% vs earlier
+                    {hasAny ? (
+                      <TrendChart data={series} metricKey={m.key} color={m.color} unit={m.unit} decimals={decimals} />
+                    ) : (
+                      <div className="h-[200px] flex items-center justify-center text-sm text-muted">
+                        No {m.label.toLowerCase()} data in this window.
                       </div>
                     )}
-                  </div>
-                </div>
-                {hasAny ? (
-                  <TrendChart data={series} metricKey={m.key} color={m.color} unit={m.unit} decimals={decimals} />
-                ) : (
-                  <div className="h-[200px] flex items-center justify-center text-sm text-muted">
-                    No {m.label.toLowerCase()} data in this window.
-                  </div>
-                )}
-                {!m.reliableInBackfill && hasAny && (
-                  <p className="mt-2 text-[11px] text-muted">
-                    Gaps are days before this metric synced — the line breaks rather than showing a false zero.
-                  </p>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
-      </section>
+                    {!m.reliableInBackfill && hasAny && (
+                      <p className="mt-2 text-[11px] text-muted">
+                        Gaps are days before this metric synced — the line breaks rather than showing a false zero.
+                      </p>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </section>
 
-      <footer className="text-xs text-muted text-center pt-4 pb-2">
-        {source === "live"
-          ? "Computed from your real Google Health history. Associations are correlations, not proof of cause."
-          : "Demo data — connect Google Health and these charts fill with your real history."}
-      </footer>
+          <footer className="text-xs text-muted text-center pt-4 pb-2">
+            Computed from your real Google Health history. Associations are correlations, not proof of cause.
+          </footer>
+        </>
+      )}
     </main>
+  );
+}
+
+function TrendsEmpty({ status }: { status: Status }) {
+  if (status === "loading") {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center text-center">
+        <div className="mb-4 h-6 w-6 rounded-full border-2 border-separator border-t-foreground animate-spin" />
+        <p className="text-sm text-muted">Loading your trends…</p>
+      </div>
+    );
+  }
+  if (status === "signin") {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+        <h2 className="text-2xl font-semibold tracking-tight">Sign in to see your trends</h2>
+        <p className="mt-2 text-sm text-muted leading-relaxed">
+          Connect Google Health and these charts fill with your real history.
+        </p>
+        <Link
+          href="/"
+          className="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full bg-foreground text-background font-medium text-sm hover:opacity-90 transition"
+        >
+          Continue with Google
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="py-24 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+      <h2 className="text-2xl font-semibold tracking-tight">Not enough history yet</h2>
+      <p className="mt-2 text-sm text-muted leading-relaxed">
+        Trends and insights appear once you&apos;ve accumulated a couple of weeks of data. Pull your
+        past history from Settings to get started.
+      </p>
+      <Link
+        href="/settings"
+        className="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full border border-separator text-foreground font-medium text-sm hover:bg-surface transition"
+      >
+        Go to Settings
+      </Link>
+    </div>
   );
 }

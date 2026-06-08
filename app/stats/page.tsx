@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { MetricTile } from "@/components/MetricTile";
 import { Calendar } from "@/components/Calendar";
-import { mockAllTimeStats, mockPersonalRecords, mockActivityAggregates } from "@/lib/mockData";
 import { ActivitiesPanel } from "@/components/ActivitiesPanel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { todayISO, addDaysISO } from "@/lib/dates";
 import { loadSettings, useSettings } from "@/lib/useSettings";
 import type { AllTimeStats, PersonalRecords, ActivityAggregate } from "@/lib/types";
+
+type Status = "loading" | "live" | "empty" | "signin";
 
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -35,10 +36,10 @@ const PRESETS: { label: string; days: number | null }[] = [
 export default function StatsPage() {
   const supabase = getSupabaseBrowser();
   const { update } = useSettings();
-  const [s, setS] = useState<AllTimeStats>(mockAllTimeStats);
-  const [p, setP] = useState<PersonalRecords>(mockPersonalRecords);
-  const [activities, setActivities] = useState<ActivityAggregate[]>(mockActivityAggregates);
-  const [source, setSource] = useState<"mock" | "live">("mock");
+  const [s, setS] = useState<AllTimeStats | null>(null);
+  const [p, setP] = useState<PersonalRecords | null>(null);
+  const [activities, setActivities] = useState<ActivityAggregate[]>([]);
+  const [status, setStatus] = useState<Status>("loading");
 
   const today = todayISO();
   const [from, setFrom] = useState<string>(""); // "" = all time
@@ -60,17 +61,23 @@ export default function StatsPage() {
 
   // Fetch stats whenever the window changes.
   useEffect(() => {
-    if (!supabase) return;
     let cancelled = false;
     (async () => {
+      if (!supabase) { setStatus("signin"); return; }
       const res = await fetch(`/api/stats${from ? `?from=${from}` : ""}`);
-      if (!res.ok || cancelled) return;
+      if (cancelled) return;
+      if (!res.ok) { setStatus(res.status === 401 ? "signin" : "empty"); return; }
       const json = await res.json();
       if (json.hasData) {
         setS(json.stats);
         setP(json.records);
         setActivities(json.activities ?? []);
-        setSource("live");
+        setStatus("live");
+      } else {
+        setS(null);
+        setP(null);
+        setActivities([]);
+        setStatus("empty");
       }
     })();
     return () => { cancelled = true; };
@@ -94,12 +101,12 @@ export default function StatsPage() {
           {from ? "Your numbers." : "Your numbers, all-time."}
         </h1>
         <p className="text-sm text-muted mt-1">
-          {source === "live"
+          {status === "live" && s
             ? `Across ${s.totalDaysTracked} day${s.totalDaysTracked === 1 ? "" : "s"} since ${fmtLong(s.firstDayRecorded)}.`
-            : "Demo data — sign in with Google to see your real numbers."}
+            : "Your all-time numbers, records, and activity breakdown."}
         </p>
 
-        {source === "live" && (
+        {status === "live" && (
           <div className="relative mt-4 flex items-center gap-2 flex-wrap">
             {PRESETS.map((preset) => {
               const isActive = preset.days === null ? !from : activePresetDays === preset.days;
@@ -143,6 +150,10 @@ export default function StatsPage() {
         )}
       </motion.header>
 
+      {status !== "live" || !s || !p ? (
+        <StatsEmpty status={status} />
+      ) : (
+        <>
       {/* OVERVIEW */}
       <section className="mb-10">
         <div className="section-label mb-3">Overview</div>
@@ -211,11 +222,53 @@ export default function StatsPage() {
       </section>
 
       <footer className="text-xs text-muted text-center pt-4 pb-2">
-        {source === "live"
-          ? "Computed from your real Google Health history."
-          : "Demo data — once you connect Google Health and accumulate history, these tiles light up with your real numbers."}
+        Computed from your real Google Health history.
       </footer>
+        </>
+      )}
     </main>
+  );
+}
+
+function StatsEmpty({ status }: { status: Status }) {
+  if (status === "loading") {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center text-center">
+        <div className="mb-4 h-6 w-6 rounded-full border-2 border-separator border-t-foreground animate-spin" />
+        <p className="text-sm text-muted">Loading your numbers…</p>
+      </div>
+    );
+  }
+  if (status === "signin") {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+        <h2 className="text-2xl font-semibold tracking-tight">Sign in to see your numbers</h2>
+        <p className="mt-2 text-sm text-muted leading-relaxed">
+          Connect Google Health to see your all-time stats and personal records.
+        </p>
+        <Link
+          href="/"
+          className="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full bg-foreground text-background font-medium text-sm hover:opacity-90 transition"
+        >
+          Continue with Google
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="py-24 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+      <h2 className="text-2xl font-semibold tracking-tight">No numbers yet</h2>
+      <p className="mt-2 text-sm text-muted leading-relaxed">
+        Once you connect Google Health and accumulate history, these tiles light up with your real
+        numbers. Pull your past history from Settings to get started.
+      </p>
+      <Link
+        href="/settings"
+        className="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-full border border-separator text-foreground font-medium text-sm hover:bg-surface transition"
+      >
+        Go to Settings
+      </Link>
+    </div>
   );
 }
 
