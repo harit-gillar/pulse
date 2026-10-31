@@ -18,20 +18,20 @@ export function TopNav() {
 
   return (
     <div className="sticky top-0 z-30 backdrop-blur-xl bg-background/70 border-b border-separator/60">
-      <div className="mx-auto max-w-[1200px] px-6 py-3 flex items-center justify-between gap-3">
-        <Link href="/dashboard" className="text-sm font-semibold tracking-tight flex items-center gap-2">
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-3">
+        <Link href="/dashboard" className="shrink-0 text-sm font-semibold tracking-tight flex items-center gap-2">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
           Pulse
         </Link>
-        <div className="flex items-center gap-2">
-          <nav className="flex items-center gap-1 rounded-full bg-surface p-1 border border-separator/60">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <nav className="flex items-center gap-0.5 sm:gap-1 rounded-full bg-surface p-1 border border-separator/60">
             {TABS.map((tab) => {
               const active = pathname.startsWith(tab.href);
               return (
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  className="relative px-4 py-1.5 text-sm font-medium rounded-full transition-colors"
+                  className="relative px-2 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-colors"
                 >
                   {active && (
                     <motion.span
@@ -50,7 +50,7 @@ export function TopNav() {
           <button
             onClick={toggle}
             aria-label="Toggle theme"
-            className="w-8 h-8 rounded-full bg-surface border border-separator/60 flex items-center justify-center text-muted hover:text-foreground transition"
+            className="shrink-0 w-8 h-8 rounded-full bg-surface border border-separator/60 flex items-center justify-center text-muted hover:text-foreground transition"
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
@@ -59,7 +59,7 @@ export function TopNav() {
             href="/settings"
             aria-label="Settings"
             title="Settings"
-            className={`w-8 h-8 rounded-full bg-surface border border-separator/60 flex items-center justify-center transition ${pathname.startsWith("/settings") ? "text-foreground" : "text-muted hover:text-foreground"}`}
+            className={`shrink-0 w-8 h-8 rounded-full bg-surface border border-separator/60 flex items-center justify-center transition ${pathname.startsWith("/settings") ? "text-foreground" : "text-muted hover:text-foreground"}`}
           >
             <GearIcon />
           </Link>

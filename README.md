@@ -17,6 +17,9 @@ A clean, Apple-style dashboard for your Google Health data. Sleep, heart, activi
 
 Hover the ⓘ on a tile to see what it means and where the number comes from.
 
+### About the scores
+Google doesn't give you Whoop-style recovery or sleep quality scores, so Pulse works them out itself from your HRV, resting heart rate, sleep and heart-rate zones, scored against your own 30-day baseline. The formulas are written out in plain English in [`lib/score.ts`](lib/score.ts). No hidden maths.
+
 ---
 
 ## Screenshots
@@ -32,6 +35,10 @@ Hover the ⓘ on a tile to see what it means and where the number comes from.
 **The front door**
 
 ![Pulse landing page](docs/screenshots/landing.png)
+
+**On your phone**
+
+<img src="docs/screenshots/mobile.png" alt="Pulse on a phone" width="300">
 
 ---
 
