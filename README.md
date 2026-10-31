@@ -2,17 +2,15 @@
 
 A clean, Apple-style dashboard for your Google Health data. Sleep, heart, activity and body stats, all on one page instead of five apps.
 
-### Live: https://pulse-smoky-five.vercel.app
+![Pulse dashboard in dark mode](docs/screenshots/dashboard-dark.png)
 
-Want a nose around without signing in? Try the [demo](https://pulse-smoky-five.vercel.app/demo). It's loaded with a made-up pro tennis player's numbers, so it looks a lot fitter than real life.
-
-> Google sign-in only works for accounts I've added as testers. The app is in Google's Testing mode, not verified. The demo works for everyone.
+<sub>Those are demo numbers from a made-up pro tennis player. Mine are not this good.</sub>
 
 ---
 
 ## What's in it
 
-- **Dashboard** — today at a glance: HRV, resting heart rate, sleep (duration, REM, deep, plus a stages breakdown), steps, active zone minutes, calories, distance, weight, SpO₂ and skin temp. Flick back through any previous day too.
+- **Dashboard** — today at a glance: HRV, resting heart rate, sleep (duration, REM, deep, plus a stages breakdown), steps, active zone minutes, calories, distance, weight, SpO₂ and skin temp, then each workout with its heart rate and zones. Flick back through any previous day too.
 - **Trends** — HRV, resting HR, sleep, steps, calories and more, charted over weeks and months.
 - **Stats** — the big numbers. Total hours slept, total steps, peak HRV, 10k step days, longest sleep streak, best week, your workouts, and how many marathons your walking adds up to. Filter by all time, 90, 30 or 7 days.
 - **Settings** — step, calorie and sleep goals, km or miles, kg or lbs, light or dark, and a button to pull your full history from Google.
@@ -21,9 +19,25 @@ Hover the ⓘ on a tile to see what it means and where the number comes from.
 
 ---
 
+## Screenshots
+
+**Light mode, if that's your thing**
+
+![Pulse dashboard in light mode](docs/screenshots/dashboard-light.png)
+
+**The whole dashboard**: sleep, activity, body, then every workout with heart rate and zones
+
+<img src="docs/screenshots/dashboard-full.png" alt="The full Pulse dashboard, top to bottom" width="720">
+
+**The front door**
+
+![Pulse landing page](docs/screenshots/landing.png)
+
+---
+
 ## Run it yourself
 
-It's Next.js 16, Tailwind v4, Framer Motion and Recharts, with Supabase for sign-in and storage, deployed on Vercel.
+It's Next.js 16, Tailwind v4, Framer Motion and Recharts, with Supabase for sign-in and storage.
 
 ```bash
 npm install
@@ -31,7 +45,7 @@ npm run dev
 # open http://localhost:3000
 ```
 
-The demo at `/demo` works straight away. For your own data you'll need to set up the following.
+The demo at [localhost:3000/demo](http://localhost:3000/demo) works straight away, no setup. For your own data you'll need the following.
 
 ### 1. Supabase
 - Make a project at supabase.com.
@@ -46,7 +60,7 @@ The demo at `/demo` works straight away. For your own data you'll need to set up
 ### 2. Google Cloud
 - Turn on the **Google Health API** (`health.googleapis.com`).
 - Set the OAuth consent screen to **Testing** and add yourself under **Test users**.
-- Create an **OAuth 2.0 Client ID** (Web application) with this redirect URI: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`
+- Create an **OAuth 2.0 Client ID** (Web application) with this redirect URI: `https://YOUR-PROJECT.supabase.co/auth/v1/callback`, and add `http://localhost:3000` under **Authorised JavaScript origins**.
 - On the **Data Access** page, add the read-only scopes listed in `GOOGLE_HEALTH_SCOPES` in [`lib/env.ts`](lib/env.ts).
 - Add the client ID and secret to `.env.local` too, so Pulse can refresh your token:
   ```
@@ -56,9 +70,6 @@ The demo at `/demo` works straight away. For your own data you'll need to set up
 
 ### 3. Supabase → Google
 Authentication → Providers → **Google**. Switch it on and paste in the client ID and secret.
-
-### 4. Vercel
-Import the repo, add the same env vars, then add your Vercel URL to the OAuth client's **Authorised JavaScript origins**.
 
 ---
 
